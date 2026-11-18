@@ -179,7 +179,7 @@ main{padding:12px 14px calc(30px + env(safe-area-inset-bottom));max-width:760px;
 </header>
 <main id="main"><div class="empty">读取中…</div></main>
 <script>
-const APPV = 'yunying-v35';   // 独立 APP 的版本号：和 sw.js 的 V 一起改（checkUpdate 用）
+const APPV = 'yunying-v36';   // 独立 APP 的版本号：和 sw.js 的 V 一起改（checkUpdate 用）
 const IN_KZ = /\/kongzhuo\//.test(location.pathname);   // 在 空桌一览 里面（pj.html）还是独立 APP
 const API = 'https://script.google.com/macros/s/AKfycbxDX1OB8iAKYYpfBlncpfov66qsDdWfq6wjs2xNGydXDbkkUPf7NsOwwmd_PG2Dbpe0/exec';
 const LS = {
@@ -189,6 +189,14 @@ const LS = {
 };
 const LOCAL = /[?&]local=1/.test(location.search);   // 本机测试：读 ./_pj.json ./_hr.json
 let K = LS.get('k', '');
+// 11/18：只有登记过的手机能用 → 和主页（index.html）同一个手机编号 dv（同一个网站，手机里共用）
+//   iPhone：放到主屏幕的 APP 各有各的存储（和 Safari 也分开）→ 独立运营部 APP 会是另一个编号，说明后面加「・运营部APP」，名单里分得清
+const DV = (() => { let v = LS.get('dv', ''); if (!/^[0-9a-f]{32}$/.test(v)) { const a = new Uint8Array(16); crypto.getRandomValues(a); v = Array.from(a, b => b.toString(16).padStart(2, '0')).join(''); LS.set('dv', v); } return v; })();
+const DVUA = (() => { const u = navigator.userAgent, st = (navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches)) ? '主屏幕APP' : '浏览器', tg = IN_KZ ? '' : '・运营部APP'; let m;
+  if ((m = u.match(/iPhone OS ([\d_]+)/))) return `iPhone iOS ${m[1].replace(/_/g, '.')}・${st}${tg}`;
+  if ((m = u.match(/iPad.*? OS ([\d_]+)/))) return `iPad iOS ${m[1].replace(/_/g, '.')}・${st}${tg}`;
+  if ((m = u.match(/Android ([\d.]+); ([^;)]+)/))) return `Android ${m[1]} ${m[2].trim()}・${st}${tg}`;
+  return `${(u.match(/Windows NT|Macintosh|Android|Linux/) || ['其他'])[0]}・${st}${tg}`; })();
 const fromUrl = (location.hash.match(/k=([^&]+)/) || [])[1];
 if (fromUrl) { K = decodeURIComponent(fromUrl); LS.set('k', K); history.replaceState(null, '', location.pathname + location.search); }
 
@@ -209,7 +217,7 @@ let tab = tabFromUrl || LS.get('pjTab', 'pj'), stSort = LS.get('pjSort', 'g'), r
 // ---------- 读数据 ----------
 async function api(what) {
   if (LOCAL) { const r = await fetch('./_' + what + '.json', { cache: 'no-store' }); return r.json(); }
-  const r = await fetch(API + '?fmt=json&what=' + what + '&k=' + encodeURIComponent(K), { cache: 'no-store' });
+  const r = await fetch(API + '?fmt=json&what=' + what + '&k=' + encodeURIComponent(K) + '&dv=' + DV + '&ua=' + encodeURIComponent(DVUA), { cache: 'no-store' });   // 11/18：以后新加的请求也要带 dv・ua，不然被后台挡
   return r.json();
 }
 function cacheGet(what) { try { return JSON.parse(LS.get('pjc_' + what, 'null')); } catch (e) { return null; } }
@@ -224,6 +232,11 @@ async function load() {
   if (a.status === 'fulfilled') {
     const d = a.value;
     if (d && d.error === 'key') { LS.del('k'); K = ''; return showKey('密码不对'); }
+    if (d && d.error === 'device') {   // 11/18：没登记的手机——手机里存的也删掉
+      LS.del('pjc_pj'); LS.del('pjc_hr'); PJ = HR = null; owner = false; LOADING = false;
+      $('main').innerHTML = `<div class="keybox"><p>🔒 这台手机还没登记，不能使用。<br>已经通知负责人。手机编号：<b>${esc(d.id || '—')}</b><br><span class="note">是自己人换了手机：请负责人在空桌一览「📱 登录手机 → 开放登记」，然后重新打开。</span></p></div>`;
+      return;
+    }
     if (d && Array.isArray(d.rows)) { PJ = d; pjErr = ''; cachePut('pj', d); }
     else pjErr = '读不到评价数据（后台还没部署新版本）';
   } else pjErr = '网络不通，显示的是上次的数据';
