@@ -325,7 +325,7 @@ const pct = x => x == null ? '' : (x >= 0 ? '▲' : '▼') + Math.abs(x * 100).t
 const today = new Date(); const TD = today.toISOString().slice(0, 10);
 
 let PJ = null, HR = null, pjErr = '', hrErr = '', owner = false;
-const tabFromUrl = (location.hash.match(/^#(pj|hr|hy|sy|ty|yc|qr|rk|cl|xq)$/) || [])[1];   // 网址带 #hr 直接开人事评价、#hy 卫生、#pj 评价
+const tabFromUrl = (location.hash.match(/^#(pj|hr|hy|sy|ty|yc|qr|rk|cl|xq|rvd)$/) || [])[1];   // 网址带 #hr 直接开人事评价、#hy 卫生、#pj 评价
 let syMonth = LS.get('syMonth', 'year'), syQ = '', sySort = LS.get('sySort', 'store'), syOpen = new Set();
 let tab = tabFromUrl || LS.get('pjTab', 'pj'), stSort = LS.get('pjSort', 'g'), rvPlat = '', openSt = new Set(), hrMonth = '', hrOpen = new Set(), hyOpen = new Set();
 
@@ -361,11 +361,12 @@ async function load() {
     else if (owner || (d && !d.error)) hrErr = '读不到人事评价（后台还没部署新版本）';
   }
   if (HRONLY && HR_TABS.indexOf(tab) < 0) tab = 'hr';
-  if (!owner && tab !== 'pj' && tab !== 'ty' && tab !== 'yc' && tab !== 'qr' && tab !== 'rk' && tab !== 'cl' && tab !== 'xq') tab = 'pj';
+  if (!owner && tab !== 'pj' && tab !== 'ty' && tab !== 'yc' && tab !== 'qr' && tab !== 'rk' && tab !== 'cl' && tab !== 'xq' && tab !== 'rvd') tab = 'pj';
   LOADING = false; lastLoad = Date.now();
   renderSoon();
   if (tab === 'qr') loadQr();
   if (tab === 'rk') loadRk();
+  if (tab === 'rvd') loadRvd();
   if (tab === 'xq') loadXq();
   if (!HRONLY) loadYcd();
 }
@@ -387,20 +388,20 @@ function saveKey() { const v = $('kin').value.trim(); if (!v) return; K = v; LS.
 function changeKey() { showKey(''); }
 
 // ---------- 公共 ----------
-function setTab(t) { if (t === 'vz') { location.href = '/kongzhuo/vz.html'; return; } if (HRONLY && HR_TABS.indexOf(t) < 0) t = 'hr'; progScroll(); const pv = tab; if (pv !== t) navPush('tab', () => setTab(pv)); tab = t; LS.set('pjTab', t); render(); window.scrollTo(0, 0); if (t === 'qr') loadQr(); if (t === 'rk') loadRk(); if (t === 'xq') loadXq(); if (!HRONLY) loadYcd(); }
+function setTab(t) { if (t === 'vz') { location.href = '/kongzhuo/vz.html'; return; } if (HRONLY && HR_TABS.indexOf(t) < 0) t = 'hr'; progScroll(); const pv = tab; if (pv !== t) navPush('tab', () => setTab(pv)); tab = t; LS.set('pjTab', t); render(); window.scrollTo(0, 0); if (t === 'qr') loadQr(); if (t === 'rk') loadRk(); if (t === 'rvd') loadRvd(); if (t === 'xq') loadXq(); if (!HRONLY) loadYcd(); }
 function render() {
   progScroll();   // v56：重画后页面变短时浏览器自己调的滚动不算「人在滑」
   SGK = []; NQK = []; SGC = [];   // 签名栏・待确认的编号表，每次重画重来
   if (BLOCKED) return;
   const ycN = ycBad().length;   // 11/16 预约异常：有订不了的页面就在按钮上显示几处
-  const tabs = HRONLY ? [['hr', '👔 人事'], ['hy', '🧹 卫生'], ['vz', '🛂 签证名簿']] : [['pj', '⭐ 评价'], ['qr', '📲 谷歌扫码'], ['ty', '📅 预约'], ['rk', '🔁 回头客'], ['cl', '📝 处理记录'], ['yc', '🚨 预约异常' + (ycN ? ' <b style="color:#fff;background:var(--bad);border-radius:9px;padding:0 6px;font-size:12px">' + ycN + '</b>' : '')], ...(owner ? [['hr', '👔 人事'], ['sy', '👤 社员'], ['hy', '🧹 卫生']] : [])];
+  const tabs = HRONLY ? [['hr', '👔 人事'], ['hy', '🧹 卫生'], ['vz', '🛂 签证名簿']] : [['pj', '⭐ 评价'], ['qr', '📲 谷歌扫码'], ['ty', '📅 预约'], ['rk', '🔁 回头客'], ['rvd', '🎫 评价单菜品'], ['cl', '📝 处理记录'], ['yc', '🚨 预约异常' + (ycN ? ' <b style="color:#fff;background:var(--bad);border-radius:9px;padding:0 6px;font-size:12px">' + ycN + '</b>' : '')], ...(owner ? [['hr', '👔 人事'], ['sy', '👤 社员'], ['hy', '🧹 卫生']] : [])];
   { const xb = $('xqb'); if (xb) xb.className = 'xqb' + (tab === 'xq' ? ' on' : ''); }
   { const h1 = document.querySelector('header h1'); if (h1 && h1.textContent !== (HRONLY ? '人事部' : '运营部')) h1.textContent = HRONLY ? '人事部' : '运营部'; }   // 11/20 人事部密码
   $('tabs').innerHTML = tabs.map(([k, n]) => '<button class="' + (tab === k ? 'on' : '') + '" onclick="setTab(\'' + k + '\')">' + n + '</button>').join('');
-  const at = tab === 'xq' ? (XQ && XQ.now) : tab === 'rk' ? (RK && RK.at) : tab === 'qr' ? (QRD && QRD.updated) : tab === 'pj' || tab === 'ty' || tab === 'yc' ? (PJ && PJ.at) : (HR && HR.at);
+  const at = tab === 'xq' ? (XQ && XQ.now) : tab === 'rk' ? (RK && RK.at) : tab === 'rvd' ? (RVD && RVD.at) : tab === 'qr' ? (QRD && QRD.updated) : tab === 'pj' || tab === 'ty' || tab === 'yc' ? (PJ && PJ.at) : (HR && HR.at);
   $('at').textContent = (at ? at.slice(5).replace('-', '/') + ' 更新' : '') + (tab === 'rk' ? (rkBusy ? '・读取最新中…' : '') : tab === 'qr' ? (qrBusy ? '・读取最新中…' : '') : LOADING ? '・读取最新中…' : (pjErr && tab !== 'hr' && tab !== 'sy' && tab !== 'hy') ? '・⚠ 没读到最新（显示的是上次的）' : '');
   { const sb = tab !== 'hr' && tab !== 'sy' && tab !== 'hy' && tab !== 'xq' ? selBar() : '', sh = $('selh'); if (sh && sh.innerHTML !== sb && !(document.activeElement && sh.contains(document.activeElement))) sh.innerHTML = sb; }   // v55：店铺选择放进顶上固定栏，往下滑也一直在
-  patchMain((tab === 'hr' ? renderHr() : tab === 'sy' ? renderSy() : tab === 'hy' ? renderHy() : tab === 'ty' ? renderTy() : tab === 'yc' ? renderYc() : tab === 'qr' ? renderQr() : tab === 'rk' ? renderRk() : tab === 'cl' ? renderCl() : tab === 'xq' ? renderXq() : renderPj()) +
+  patchMain((tab === 'hr' ? renderHr() : tab === 'sy' ? renderSy() : tab === 'hy' ? renderHy() : tab === 'ty' ? renderTy() : tab === 'yc' ? renderYc() : tab === 'qr' ? renderQr() : tab === 'rk' ? renderRk() : tab === 'rvd' ? renderRvd() : tab === 'cl' ? renderCl() : tab === 'xq' ? renderXq() : renderPj()) +
     '<div class="foot"><a onclick="changeKey()">🔑 换密码（股东 / 店长 / 人事部）</a>' + (IN_KZ ? '' : '　版本 ' + APPV.replace('yunying-v', '')) + '</div>');
 }
 const stars = s => s == null ? '' : '<span class="stars">' + '★'.repeat(Math.round(s)) + '<span style="opacity:.25">' + '★'.repeat(5 - Math.round(s)) + '</span></span>';
@@ -522,6 +523,51 @@ function renderXq() {
         : (r.st !== '不做' ? `<div class="note"><a class="lnk" onclick="xqToggle('${r.id}')">➕ 补充</a></div>` : ''))
       + (xqOpen === r.id ? xqMsg : '') + '</div>';
   }).join('') : '<div class="note">还没有。</div>') + '</div>' + (xqOpen ? '' : '') + '</div>';
+  return h;
+}
+
+// ================= 🎫 评价单菜品 =================
+// 11/20 运营部 陈 提需求 Y3：「这月到今天为止各店铺计算 レビュアー割引 的相同菜品 合计情况」（股东同意做）。
+// 电脑 运营部\レビュアー割引\レビュアー割引菜品.py 读取消日报系统每天下载的收银资料（PE・ダイニー・Air）→ 云端「レビュアー割引菜品」→ 后台 what=rvd。
+// 行：rvdm＝说明（月份・到哪天・单数），rvd＝一家店（s 店名、n 单数、disc 评价优惠合计、d [[菜名, 份数, 金额]…]），rvda＝全店合计 d [[菜名, 份数, 金额, 几家店]…]。
+let RVD = cacheGet('rvd'), rvdBusy = false, rvdErr = '', rvdOpen = new Set(), rvdAllN = 30;
+async function loadRvd() {
+  if (rvdBusy) return;
+  rvdBusy = true; rvdErr = ''; if (tab === 'rvd') render();
+  try {
+    const d = await api('rvd');
+    if (d && Array.isArray(d.rows)) { RVD = d; cachePut('rvd', d); }
+    else if (d && d.error === 'device') { rvdBusy = false; return blockDevice(d); }
+    else rvdErr = '读不到评价单菜品数据（后台还没部署新版本）';
+  } catch (e) { rvdErr = '网络不通，显示的是上次的数据'; }
+  rvdBusy = false;
+  if (tab === 'rvd') renderSoon();
+}
+function rvdTog(s) { if (rvdOpen.has(s)) rvdOpen.delete(s); else rvdOpen.add(s); render(); }
+const rvdKey = s => String(s || '').replace(/[\s()（）]/g, '');
+function renderRvd() {
+  const R = (RVD && RVD.rows) || [], m = R.find(r => r.k === 'rvdm') || {}, S0 = R.filter(r => r.k === 'rvd'), A = (R.find(r => r.k === 'rvda') || {}).d || [];
+  if (!S0.length) return '<div class="sec"><p class="note">' + esc(rvdErr || (rvdBusy ? '读取中…' : '还没有评价单菜品数据')) + '</p></div>';
+  const S1 = SEL ? S0.filter(r => rvdKey(r.s).includes(rvdKey(SEL))) : S0, S = S1.length ? S1 : S0;
+  const nO = S.reduce((t, r) => t + r.n, 0), nD = S.reduce((t, r) => t + r.disc, 0), M = m.month || '';
+  const tbl = (L, wide) => '<table class="tbl"><tr><th style="text-align:left">菜品</th><th>份数</th><th>金额<br><small>菜单价</small></th>' + (wide ? '<th>几家店</th>' : '') + '</tr>' +
+    L.map(x => '<tr><td style="text-align:left">' + esc(x[0]) + '</td><td><b>' + fmt(x[1]) + '</b></td><td>' + fmt(x[2]) + '</td>' + (wide ? '<td>' + fmt(x[3]) + '</td>' : '') + '</tr>').join('') + '</table>';
+  let h = '<div class="sec"><h2>🎫 评价单菜品<small>' + esc(M ? +M.slice(5) + '月' : '') + ' 1日〜' + esc((m.upto || '').slice(5).replace('-', '/')) + '：用了评价优惠（レビュアー割引・口コミ等）的单里点了什么</small></h2>';
+  if (rvdErr) h += '<p class="note wn">⚠ ' + esc(rvdErr) + '</p>';
+  if (SEL && !S1.length) h += '<p class="note">🏪 ' + esc(SEL) + ' 这个月没有评价单（或店名对不上），下面是全部店。</p>';
+  h += '<div class="grid g3"><div class="card kpi"><span class="plat">评价单</span><br><b>' + fmt(nO) + '</b> 张</div>' +
+    '<div class="card kpi"><span class="plat">评价优惠合计</span><br><b>' + fmt(nD) + '</b> 円</div>' +
+    '<div class="card kpi"><span class="plat">店数</span><br><b>' + fmt(S.length) + '</b> 家</div></div>';
+  if (!SEL || !S1.length) {
+    h += '<div class="card"><b>全部店合计：点得最多的菜</b>' + tbl(A.slice(0, rvdAllN), true) +
+      (A.length > rvdAllN ? '<p class="note"><a class="lnk" onclick="rvdAllN+=50;render()">再看 50 道（共 ' + A.length + ' 道）</a></p>' : '') + '</div>';
+  }
+  h += '<div class="sec"><h2>🏪 各店<small>点店名展开这家店评价单里的全部菜</small></h2>' + S.map(r => {
+    const op = rvdOpen.has(r.s) || S.length === 1;
+    return '<div class="card"><div onclick="rvdTog(\'' + esc(r.s).replace(/'/g, '&#39;') + '\')" style="cursor:pointer;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap"><b>' + esc(r.s) + '</b><span class="tyc">评价单 ' + fmt(r.n) + ' 张・优惠 ' + fmt(r.disc) + ' 円</span><span style="margin-left:auto">' + (op ? '▲' : '▼') + '</span></div>' +
+      (op ? tbl(r.d.slice(0, 150), false) : '<div class="tyc" style="margin-top:4px">前 3：' + r.d.slice(0, 3).map(x => esc(x[0]) + ' ' + fmt(x[1]) + ' 份').join('・') + '</div>') + '</div>';
+  }).join('') + '</div>';
+  h += '<p class="note">📌 怎么看：评价单＝用了评价优惠（レビュアー割引・口コミ・食べログレビュー等，和取消日报「评价优惠」同一个判断）的单。份数＝这些单里点的数量；金额＝菜单价×份数（还没扣优惠）。お通し・0 円的饮料人数行也照收银原样列出。每天 12 点取消日报做完后更新，到前一天为止。来源：' + esc(m.src || '收银资料') + '。</p></div>';
   return h;
 }
 
