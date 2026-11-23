@@ -1,6 +1,6 @@
 // 运营部 APP：只缓存网页外壳（断网也能打开）；数据每次从网上读，读不到时网页自己显示上次的数据。
 // 打开时先上网拿新网页，1.5 秒没拿到先用手机里存的。改版时这里的 V 和 index.html 的 APPV 一起改。
-const V = 'yunying-v71';
+const V = 'yunying-v72';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(V).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))));
