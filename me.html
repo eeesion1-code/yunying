@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="我的分数">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<title>我的分数</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--ink:#1a1c20;--sub:#6b7280;--faint:#b6bcc6;--line:#e5e7eb;--soft:#f8f9fb;--brand:#1d4ed8;--good:#15803d;--warn:#c2410c;--bad:#dc2626}
+@media (prefers-color-scheme:dark){:root{--bg:#111318;--card:#1b1e24;--ink:#eef0f3;--sub:#9aa3af;--faint:#4b5563;--line:#2b2f37;--soft:#171a20;--brand:#7aa2ff;--good:#4ade80;--warn:#fb923c;--bad:#f87171}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans","Microsoft YaHei",sans-serif;padding:16px 16px calc(24px + env(safe-area-inset-bottom))}
+.wrap{max-width:560px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+h1{font-size:22px;margin:4px 0 2px}
+.sub{color:var(--sub);font-size:13px}
+.big{font-size:40px;font-weight:800;line-height:1.1}
+.mrow{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.mcell{min-width:52px;text-align:center;border:1px solid var(--line);border-radius:10px;padding:4px 6px;font-size:12px;color:var(--sub);background:var(--soft)}
+.mcell b{display:block;font-size:17px;color:var(--ink)}
+table{width:100%;border-collapse:collapse;font-size:14px;margin-top:6px}
+th,td{border-bottom:1px solid var(--line);padding:6px 4px;text-align:center}
+th{color:var(--sub);font-weight:600;font-size:12px}
+.issue{display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px dashed var(--line);font-size:14px;flex-wrap:wrap}
+.issue .x{flex-basis:100%;color:var(--sub);font-size:12.5px;padding-left:44px}
+.pill{display:inline-block;min-width:36px;text-align:center;border-radius:8px;padding:0 6px;font-weight:700;font-size:13px}
+.p-bad{background:color-mix(in srgb,var(--bad) 16%,transparent);color:var(--bad)}
+.p-warn{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
+.p-soft{background:var(--soft);color:var(--sub)}
+.ok{color:var(--good)}.dn{color:var(--bad)}
+button{font:inherit;border:0;border-radius:10px;padding:11px 14px;background:var(--brand);color:#fff;font-weight:700;width:100%;margin-top:8px;cursor:pointer}
+button.ghost{background:var(--soft);color:var(--ink);border:1px solid var(--line)}
+input.code{font-size:28px;letter-spacing:12px;text-align:center;width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);margin-top:10px}
+.codebig{font-size:48px;font-weight:800;letter-spacing:14px;text-align:center;margin:10px 0 4px}
+.note{color:var(--sub);font-size:12.5px;margin:6px 0 0}
+ol{padding-left:20px;margin:6px 0}
+li{margin:4px 0}
+.empty{color:var(--sub);text-align:center;padding:40px 0}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="empty">读取中…</div></div>
+<script>
+// 11/28 社员专属链接：…/yunying/me.html?t=随机码。只显示这个人自己的评分（不含奖金）和所在店的卫生检查。
+// 只认第一次打开的入口（微信・浏览器・桌面图标 各算一个，最多 3 个）；换入口用 4 位配对码；「📌 放到手机桌面」网址里带码自动配对。
+// 不把分数存进手机（每次打开都向后台读）；手机里只存一个入口编号。
+const API = 'https://script.google.com/macros/s/AKfycbxDX1OB8iAKYYpfBlncpfov66qsDdWfq6wjs2xNGydXDbkkUPf7NsOwwmd_PG2Dbpe0/exec';
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const Q = new URLSearchParams(location.search);
+const T = (Q.get('t') || '').toLowerCase();
+const STAND = !!(navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches));
+const WX = /MicroMessenger/i.test(navigator.userAgent);
+const IOS = /iPhone|iPad|iPod/i.test(navigator.userAgent), AND = /Android/i.test(navigator.userAgent);
+const LB = (STAND ? '桌面图标' : WX ? '微信' : /CriOS|Chrome/i.test(navigator.userAgent) ? 'Chrome' : /Safari/i.test(navigator.userAgent) ? 'Safari' : '浏览器') + '・' + (IOS ? 'iPhone' : AND ? 'Android' : '电脑');
+const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+const E = (() => { const k = 'meE_' + T; let v = lsGet(k); if (!/^[0-9a-f]{32}$/.test(v || '')) { const a = new Uint8Array(16); crypto.getRandomValues(a); v = Array.from(a, b => b.toString(16).padStart(2, '0')).join(''); lsSet(k, v); } return v; })();
+async function call(what, extra) {
+  const u = API + '?fmt=json&what=' + what + '&t=' + encodeURIComponent(T) + '&e=' + E + '&lb=' + encodeURIComponent(LB) + (extra || '');
+  const r = await fetch(u, { cache: 'no-store' });
+  return r.json();
+}
+const scCol = v => v == null ? 'var(--faint)' : v >= 95 ? 'var(--good)' : v >= 80 ? 'var(--ink)' : v >= 70 ? 'var(--warn)' : 'var(--bad)';
+const RN = x => ({ '店长': '①', '料理长': '②' })[x] || x;
+const md = s => String(s || '').slice(5).replace('-', '/');
+function show(h) { $('app').innerHTML = h; }
+function msg(title, body) { show('<div class="card"><h1>' + title + '</h1><p class="sub">' + body + '</p></div>'); }
+
+async function start() {
+  if (!/^[0-9a-f]{32}$/.test(T)) return msg('链接不完整', '请从股东发给你的微信消息里，直接点那个链接打开。');
+  let d;
+  try { d = await call('me'); } catch (e) { return msg('没读到', '网络不通，请稍后再打开一次。'); }
+  if (d && d.error === 'pair') {
+    const p = Q.get('p') || '', tried = lsGet('meP_' + T) === p;
+    if (/^\d{4}$/.test(p) && !tried) {   // 「📌 放到手机桌面」带过来的码：自动配对一次
+      lsSet('meP_' + T, p);
+      try { const r = await call('mepair', '&c=' + p); if (r && r.ok) return render(r); if (r && r.error !== 'code') return err(r); } catch (e) {}
+    }
+    return pairUI(d);
+  }
+  if (!d || !d.ok) return err(d);
+  render(d);
+}
+function err(d) {
+  const e = (d && d.error) || '';
+  if (e === 'link') return msg('这个链接已经不能用了', '可能已经作废或换了新链接。请找股东要新的链接。');
+  if (e === 'full') return msg('已经有 3 个地方在用', '这个链接最多在 3 个地方用（微信・浏览器・桌面图标）。请找股东删掉一个不用的，再打开。');
+  if (e === 'locked') return msg('输错太多次，先锁住了', '请在 ' + new Date(d.until).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) + ' 以后再试，或者找股东要配对码。');
+  if (e === 'pair') return pairUI(d);
+  return msg('没读到', '请稍后再打开一次。' + (e ? '（' + esc(e) + '）' : ''));
+}
+function pairUI(d) {
+  if (d && d.full) return err({ error: 'full' });
+  show('<div class="card"><h1>要配对一下</h1><p class="sub">这个链接已经在别的地方打开过（例如微信）。如果是你本人：</p><ol>' +
+    '<li>回到<b>已经能看到自己分数</b>的地方（通常是微信里点开的那个）</li><li>点最下面「📲 换到别的浏览器／桌面」，会出现 4 位数字</li><li>把 4 位数字填在下面</li></ol>' +
+    '<input class="code" id="cin" inputmode="numeric" maxlength="4" autocomplete="one-time-code" placeholder="____">' +
+    '<button onclick="doPair()">确认</button><p class="note" id="pmsg"></p><p class="note">一个入口都打不开了（换手机、清了缓存）：请找股东，他可以直接给你配对码。</p></div>');
+}
+async function doPair() {
+  const c = ($('cin').value || '').trim();
+  if (!/^\d{4}$/.test(c)) { $('pmsg').textContent = '请填 4 位数字'; return; }
+  $('pmsg').textContent = '确认中…';
+  let r; try { r = await call('mepair', '&c=' + c); } catch (e) { $('pmsg').textContent = '网络不通，请再按一次'; return; }
+  if (r && r.ok) return render(r);
+  if (r && r.error === 'code') { $('pmsg').innerHTML = '<span class="dn">数字不对或已经过期</span>（还能试 ' + r.left + ' 次）'; return; }
+  err(r);
+}
+
+function render(d) {
+  const ya = d.ya, Z = ya && ya['年涨'];
+  let h = '<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px"><div><h1>' + esc(d['名']) + '</h1><div class="sub">' + esc((ya && ya['店历'] || [d['店']]).join('→')) +
+    (Z && /^(①|②)$/.test(RN(Z['职位'])) ? '・' + esc(RN(Z['职位'])) : '') + '</div></div>' +
+    '<div style="text-align:right"><div class="big" style="color:' + scCol(Z ? Z['综合'] : null) + '">' + (Z && Z['综合'] != null ? Z['综合'] : '—') + '</div><div class="sub">' + (Z ? '全年平均・' + Z['月数'] + ' 个月' : '还没有全年分数') + '</div></div></div>';
+  if (Z) {
+    const ms = Object.keys(Z['月'] || {}).sort();
+    h += '<div class="mrow">' + ms.map(m => { const e = Z['月'][m] || []; const v = e.length ? Math.round(e.reduce((a, q) => a + q[2], 0) / e.length * 10) / 10 : null; return '<span class="mcell">' + +m.slice(5) + '月<b style="color:' + scCol(v) + '">' + (v == null ? '—' : v) + '</b></span>'; }).join('') + '</div>' +
+      '<p class="note">全员 ' + Z['人数'] + ' 人中第 ' + Z['排名'] + ' 名・近 3 个月 ' + Z['近3月'] + '・最高 ' + Z['最高'] + '・最低 ' + Z['最低'] + '</p>';
+  }
+  h += '</div>';
+  if ((d.sy || []).length) {
+    h += '<div class="card"><b>📋 每月评分</b><table><tr><th>月</th><th>店</th><th>评分</th><th>T/G 扣</th><th>出勤</th></tr>' +
+      d.sy.slice().sort((a, b) => a['月'].localeCompare(b['月'])).map(s => '<tr><td>' + +s['月'].slice(5) + '月</td><td>' + esc(s['店']) + '</td><td style="font-weight:700;color:' + scCol(s['评分']) + '">' + (s['评分'] != null ? s['评分'] : '—') + '</td><td>' + ((s['T'] || s['G']) ? (s['T'] || 0) + '/' + (s['G'] || 0) : '') + '</td><td>' + (s['出勤天'] ? s['出勤天'] + ' 天' : '') + '</td></tr>').join('') +
+      '</table><p class="note">「—」＝这个月表上没有打分。T/G＝全店的 食べログ・Google 差评扣分。</p></div>';
+  }
+  h += hyBox(d['店'], d.hy || []);
+  h += '<div class="card">' + (STAND ? '' : '<button onclick="toDesk()">📌 放到手机桌面</button>') + '<button class="ghost" onclick="getCode()">📲 换到别的浏览器／桌面</button><div id="act"></div>' +
+    '<p class="note">数据更新：' + esc(d.at || '') + '。这个页面只有你自己能看；链接请不要转给别人。</p></div>';
+  show(h);
+}
+function hyBox(st, l) {
+  l = l.slice().sort((a, b) => a['日期'].localeCompare(b['日期']));
+  const head = '<b>🧹 ' + esc(st) + ' 卫生检查</b>';
+  if (!l.length) return '<div class="card">' + head + '<p class="note">还没有这家店的卫生检查</p></div>';
+  const c = l[l.length - 1], CAT = {};
+  l.forEach(z => (z['问题'] || []).forEach(i => { (CAT[i['区']] = CAT[i['区']] || new Set()).add(i['类']); }));
+  ['前厅', '后厨'].forEach(a => { CAT[a] = CAT[a] || new Set(); });
+  const area = a => {
+    const its = (c['问题'] || []).filter(i => i['区'] === a), g = {};
+    its.forEach(i => (g[i['类']] = g[i['类']] || []).push(i));
+    const full = [...CAT[a]].filter(k => !g[k]), t = its.reduce((q, i) => q + i['扣'], 0), gap = Math.round((100 - t - c[a]) * 10) / 10;
+    return '<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;align-items:baseline"><b>' + a + '</b><span><b style="font-size:20px;color:' + (c[a] >= 90 ? 'var(--good)' : c[a] >= 75 ? 'var(--warn)' : 'var(--bad)') + '">' + c[a] + '</b><span class="sub"> ／100</span></span></div>' +
+      Object.keys(g).sort((x, y) => g[y].reduce((q, i) => q + i['扣'], 0) - g[x].reduce((q, i) => q + i['扣'], 0)).map(k =>
+        '<div style="margin-top:6px"><span style="font-size:13px;font-weight:700">' + esc(k) + ' <span class="dn">−' + g[k].reduce((q, i) => q + i['扣'], 0) + '</span></span>' +
+        g[k].map(i => '<div class="issue"><span class="pill ' + (i['扣'] >= 15 ? 'p-bad' : i['扣'] >= 3 ? 'p-warn' : 'p-soft') + '">−' + i['扣'] + '</span><span>' + esc(i['项']) + '</span>' + (i['整改'] ? '<span class="x">' + esc(i['整改']) + '</span>' : '') + '</div>').join('') + '</div>').join('') +
+      (full.length ? '<div style="margin-top:6px;font-size:13px"><span class="ok">✓ 满分（没扣分）</span>：' + full.map(esc).join('、') + '</div>' : '') +
+      (gap ? '<div style="margin-top:4px;font-size:12.5px;color:var(--warn)">⚠ 表上' + a + ' ' + c[a] + ' 分，扣分项加起来 −' + t + (gap > 0 ? '，还有 ' + gap + ' 分表上没写扣在哪一项' : '，多扣了 ' + (-gap) + ' 分') + '</div>' : '') + '</div>';
+  };
+  return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline">' + head + '<span><span style="font-size:26px;font-weight:800;color:' + (c['合计'] >= 180 ? 'var(--good)' : c['合计'] >= 150 ? 'var(--warn)' : 'var(--bad)') + '">' + c['合计'] + '</span><span class="sub"> ／200</span></span></div>' +
+    '<div class="sub">' + (c['日期是推的'] ? +c['日期'].slice(5, 7) + '月' : md(c['日期'])) + ' 检查・扣分 ' + (c['问题'] || []).length + ' 项</div>' + area('前厅') + area('后厨') +
+    (l.length > 1 ? '<p class="note">历次：' + l.map(z => md(z['日期']) + ' ' + z['合计']).join(' → ') + '</p>' : '') +
+    '<p class="note">卫生是按店检查的（前厅・后厨各 100 分起扣），这是全店的分数。</p></div>';
+}
+let cdT = 0;
+function countdown(exp, el) { clearInterval(cdT); const f = () => { const s = Math.max(0, Math.round((exp - Date.now()) / 1000)); const e = $(el); if (!e) return clearInterval(cdT); e.textContent = s ? '还有 ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') + ' 有效' : '已经过期，请再按一次'; if (!s) clearInterval(cdT); }; f(); cdT = setInterval(f, 1000); }
+async function getCode() {
+  $('act').innerHTML = '<p class="note">拿配对码中…</p>';
+  let r; try { r = await call('mecode', '&n=1'); } catch (e) { $('act').innerHTML = '<p class="note dn">网络不通，请再按一次</p>'; return; }
+  if (!r || !r.ok) { $('act').innerHTML = '<p class="note dn">没拿到（' + esc((r && r.error) || '') + '）</p>'; return; }
+  $('act').innerHTML = '<div class="codebig">' + r.code + '</div><p class="note" style="text-align:center" id="cd"></p><p class="note">在新的地方（别的浏览器・桌面图标）打开同一个链接，把这 4 位数字填进去。只能用一次。</p>';
+  countdown(r.exp, 'cd');
+}
+async function toDesk() {
+  $('act').innerHTML = '<p class="note">准备中…</p>';
+  let r; try { r = await call('mecode', '&n=2'); } catch (e) { $('act').innerHTML = '<p class="note dn">网络不通，请再按一次</p>'; return; }
+  if (!r || !r.ok) { $('act').innerHTML = '<p class="note dn">没准备好（' + esc((r && r.error) || '') + '）</p>'; return; }
+  try { history.replaceState(null, '', location.pathname + '?t=' + T + '&p=' + r.code); } catch (e) {}   // 网址里带上码：在浏览器打开・桌面图标打开时自动配对
+  const steps = WX
+    ? '<li>点右上角「<b>…</b>」→「<b>在浏览器打开</b>」' + (IOS ? '（Safari）' : '') + '，会自动配对，不用输数字</li>' + (IOS ? '<li>在 Safari 点下面的分享按钮（方框加箭头）→「<b>添加到主屏幕</b>」→「添加」</li>' : '<li>在浏览器右上角「⋮」→「<b>添加到主屏幕</b>」</li>')
+    : (IOS ? '<li>点下面的分享按钮（方框加箭头）→「<b>添加到主屏幕</b>」→「添加」</li>' : '<li>点右上角「⋮」→「<b>添加到主屏幕</b>」</li>');
+  $('act').innerHTML = '<ol>' + steps + '<li>回到手机桌面，点「<b>我的分数</b>」图标打开一次，会自动配对</li></ol><p class="note" id="cd"></p><p class="note">要在 10 分钟内做完；超过了就再按一次「📌 放到手机桌面」。没有自动配对的话，用「📲 换到别的浏览器／桌面」拿 4 位数字输入。</p>';
+  countdown(r.exp, 'cd');
+}
+start();
+</script>
+</body>
+</html>
